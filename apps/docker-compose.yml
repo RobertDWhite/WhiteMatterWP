@@ -1,0 +1,70 @@
+version: '3.7'
+services:
+  db:
+    image: mariadb:latest
+    container_name: wp-db
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - default
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DATABASE_NAME}
+      MYSQL_USER: ${DATABASE_USER}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+      TZ: ${TZ}
+
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:latest
+    container_name: wordpress
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${DATABASE_NAME}
+      WORDPRESS_DB_USER: ${DATABASE_USER}
+      WORDPRESS_DB_PASSWORD: ${DATABASE_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - ${USERDIR}/wordpress/wp-data:/var/www/html
+    networks:
+      - proxy
+      - default
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.wordpress-secure.entrypoints=https"
+      - "traefik.http.routers.wordpress-secure.rule=Host(`${DOMAIN}`)"
+  
+  portainer:
+    container_name: portainer
+    image: portainer/portainer:latest
+    restart: unless-stopped
+    command: -H unix:///var/run/docker.sock
+    networks:
+      - proxy
+      - default
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      TZ: ${TZ}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.portainer-secure.entrypoints=https"
+      - "traefik.http.routers.portainer-secure.rule=Host(`portainer.${DOMAIN}`)"
+    
+volumes:
+  db-data:
+
+networks:
+  proxy:
+    external: true
